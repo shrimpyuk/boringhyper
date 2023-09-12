@@ -1,4 +1,4 @@
-use async_compression::tokio::bufread::GzipDecoder;
+use async_compression::tokio::bufread::{BrotliDecoder, GzipDecoder, ZlibDecoder};
 use async_trait::async_trait;
 use boring::ssl::{SslConnector, SslMethod, SslVersion};
 use futures::TryStreamExt;
@@ -80,7 +80,7 @@ impl ChromeHeadersExt for request::Builder {
     fn with_chrome_headers(self) -> Self {
         self
             .header("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-            .header("accept-encoding", "gzip") // chrome sends "gzip, deflate, br", but it works too? todo
+            .header("accept-encoding", "gzip, deflate, br")
             .header("accept-language", "en")
             .header("cache-control", "max-age=0")
             .header("sec-fetch-dest", "document")
@@ -125,6 +125,32 @@ impl ReadBodyExt for Response<Body> {
                             .map_err(|err| std::io::Error::new(ErrorKind::Other, err)),
                     );
                     let mut decoder = GzipDecoder::new(stream_reader);
+                    let mut buf = Vec::new();
+                    decoder
+                        .read_to_end(&mut buf)
+                        .await
+                        .map_err(Error::ReadToEnd)?;
+                    Ok(buf)
+                }
+                Ok("deflate") => {
+                    let stream_reader = StreamReader::new(
+                        self.body_mut()
+                            .map_err(|err| std::io::Error::new(ErrorKind::Other, err)),
+                    );
+                    let mut decoder = ZlibDecoder::new(stream_reader);
+                    let mut buf = Vec::new();
+                    decoder
+                        .read_to_end(&mut buf)
+                        .await
+                        .map_err(Error::ReadToEnd)?;
+                    Ok(buf)
+                }
+                Ok("br") => {
+                    let stream_reader = StreamReader::new(
+                        self.body_mut()
+                            .map_err(|err| std::io::Error::new(ErrorKind::Other, err)),
+                    );
+                    let mut decoder = BrotliDecoder::new(stream_reader);
                     let mut buf = Vec::new();
                     decoder
                         .read_to_end(&mut buf)
