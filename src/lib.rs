@@ -81,14 +81,14 @@ impl ChromeHeadersExt for request::Builder {
         self
             .header("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
             .header("accept-encoding", "gzip") // chrome sends "gzip, deflate, br", but it works too? todo
-            .header("accept-language", "pl")
+            .header("accept-language", "en")
             .header("cache-control", "max-age=0")
             .header("sec-fetch-dest", "document")
             .header("sec-fetch-mode", "navigate")
             .header("sec-fetch-site", "none")
             .header("sec-fetch-user", "?1")
             .header("upgrade-insecure-requests", "1")
-            .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+            .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
     }
 }
 
