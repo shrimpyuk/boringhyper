@@ -15,6 +15,56 @@ use tokio_util::io::StreamReader;
 
 pub type Client = hyper::Client<HttpsConnector<HttpConnector>>;
 
+pub struct CookieClient {
+    inner: Client,
+    cookie_jar: cookie::CookieJar,
+}
+
+impl CookieClient {
+    pub fn new() -> Self {
+        CookieClient {
+            inner: create_client(),
+            cookie_jar: cookie::CookieJar::new(),
+        }
+    }
+
+    pub fn get_cookie_header(&self, url: &hyper::Uri) -> Option<String> {
+        let domain = url.host()?;
+        let cookies = self.cookie_jar.iter().filter(|c| c.domain() == Some(domain)).collect::<Vec<_>>();
+
+        if cookies.is_empty() {
+            None
+        } else {
+            Some(cookies.into_iter().map(|c| c.encoded().to_string()).collect::<Vec<_>>().join("; "))
+        }
+    }
+
+    pub async fn request(&self, mut req: hyper::Request<Body>) -> Result<Response<Body>> {
+        // Clone the cookie jar for thread safety.
+        let mut cookie_jar = self.cookie_jar.clone();
+
+        // Add cookies to request if any.
+        let uri = req.uri().clone();
+        if let Some(cookie_header) = self.get_cookie_header(&uri) {
+            req.headers_mut().insert(hyper::header::COOKIE, cookie_header.parse().unwrap());
+        }
+
+        // Make the request.
+        let mut response = self.inner.request(req).await.map_err(|e| Error::ReadUncompressed(e))?;
+
+        // Store response cookies.
+        if let Some(cookie_headers) = response.headers().get_all(hyper::header::SET_COOKIE).iter().next() {
+            for raw_cookie in cookie_headers.to_str().unwrap_or_default().split(';') {
+                if let Ok(parsed_cookie) = cookie::Cookie::parse_encoded(raw_cookie) {
+                    cookie_jar.add_original(parsed_cookie.into_owned());
+                }
+            }
+        }
+
+        Ok(response)
+    }
+}
+
 /*
  * Try to match it to be equal with real chrome build.
  * https://tools.scrapfly.io/api/fp/ja3?extended=1
